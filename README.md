@@ -1,9 +1,8 @@
-# aspirants
-#upsc practice app
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'chat_screen.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:convert';
@@ -11,12 +10,9 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(MyApp());
 }
 
@@ -33,7 +29,6 @@ class MyApp extends StatelessWidget {
       }
     });
 
-  
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -58,29 +53,28 @@ class MyApp extends StatelessWidget {
 }
 
 /////////////////////////////////////////////////////////////////////////////
-/////////////login screen////////////////////////////////////////////////////
+///////////////////////login screen//////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////
 
 class LoginScreen extends StatelessWidget {
-
   Future<User?> signInWithGoogle() async {
     print("🔥 Google Sign-In function started");
 
-    final GoogleSignInAccount? googleUser =
-        await GoogleSignIn().signIn();
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
     if (googleUser == null) return null;
 
     final GoogleSignInAuthentication googleAuth =
-      await googleUser.authentication;
+        await googleUser.authentication;
 
     final credential = GoogleAuthProvider.credential(
-    accessToken: googleAuth.accessToken,
-    idToken: googleAuth.idToken,
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
     );
 
-    final userCredential = await FirebaseAuth.instance
-      .signInWithCredential(credential);
+    final userCredential = await FirebaseAuth.instance.signInWithCredential(
+      credential,
+    );
 
     final user = userCredential.user;
 
@@ -91,8 +85,7 @@ class LoginScreen extends StatelessWidget {
       print("Name: ${user.displayName}");
       print("Email: ${user.email}");
 
-      final userRef =
-          FirebaseFirestore.instance.collection('users').doc(uid);
+      final userRef = FirebaseFirestore.instance.collection('users').doc(uid);
 
       final doc = await userRef.get();
 
@@ -125,9 +118,7 @@ class LoginScreen extends StatelessWidget {
             if (user != null) {
               Navigator.pushReplacement(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => HomeScreen(),
-                ),
+                MaterialPageRoute(builder: (context) => HomeScreen()),
               );
             }
           },
@@ -137,7 +128,6 @@ class LoginScreen extends StatelessWidget {
     );
   }
 }
-
 
 ////////////////////////////////////////////////////////////
 /// 🏠 HOME SCREEN
@@ -161,7 +151,7 @@ class HomeScreen extends StatelessWidget {
                 (route) => false,
               );
             },
-          )
+          ),
         ],
       ),
       body: Center(
@@ -183,32 +173,23 @@ class HomeScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               // 🔥 Icon
-              Icon(
-                Icons.edit_note,
-                size: 60,
-                color: Colors.blue,
-              ),
+              Icon(Icons.edit_note, size: 60, color: Colors.blue),
 
               SizedBox(height: 16),
 
-              // 🔥 Title
+              // 🔥 Title//////////
               Text(
                 "Essay Practice",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
 
               SizedBox(height: 10),
 
-              // 🔥 Subtitle
+              // 🔥 Subtitle////////
               Text(
-                "Practice daily UPSC essays\nand get feedback",
+                "Practice daily UPSC essays and get feedback",
                 textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(color: Colors.grey[600]),
               ),
 
               SizedBox(height: 20),
@@ -226,15 +207,33 @@ class HomeScreen extends StatelessWidget {
                   onPressed: () {
                     Navigator.push(
                       context,
+                      MaterialPageRoute(builder: (context) => DateScreen()),
+                    );
+                  },
+                  child: Text("Start Practice", style: TextStyle(fontSize: 16)),
+                ),
+              ),
+              ////////dashboard button/////
+              SizedBox(height: 10),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
                       MaterialPageRoute(
-                        builder: (context) => DateScreen(),
+                        builder: (context) => DashboardScreen(),
                       ),
                     );
                   },
-                  child: Text(
-                    "Start Practice",
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  child: Text("My Dashboard", style: TextStyle(fontSize: 16)),
                 ),
               ),
             ],
@@ -244,13 +243,432 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+//////////////////////////////////////////////////////////
+//////////////dashboard screen//////////////////////////
+
+class DashboardScreen extends StatefulWidget {
+  @override
+  _DashboardScreenState createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  late Future<Map<String, dynamic>> statsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    statsFuture = fetchUserStats();
+  }
+
+  Future<Map<String, dynamic>> fetchUserStats() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    int total = 0;
+    int count = 0;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('essays')
+        .get();
+
+    for (var doc in snapshot.docs) {
+      total += int.tryParse(doc['score'].toString()) ?? 0;
+      count++;
+    }
+
+    double avg = count == 0 ? 0 : total / count;
+
+    return {'total': total, 'count': count, 'avg': avg.toStringAsFixed(1)};
+  }
+
+  Future<void> refreshData() async {
+    setState(() {
+      statsFuture = fetchUserStats();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("My Dashboard")),
+
+      body: RefreshIndicator(
+        onRefresh: refreshData,
+
+        child: FutureBuilder(
+          future: statsFuture,
+          builder: (context, snapshot) {
+            // 🔄 LOADING
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            // ❌ ERROR
+            if (snapshot.hasError) {
+              return Center(child: Text("Error: ${snapshot.error}"));
+            }
+
+            // ⚠️ NO DATA
+            if (!snapshot.hasData || snapshot.data == null) {
+              return Center(child: Text("No data found"));
+            }
+
+            final data = snapshot.data as Map<String, dynamic>;
+
+            return Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🔥 TITLE
+                  Text(
+                    "Your Performance",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // 🔥 CARDS
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildCard(
+                          "Total Score",
+                          data['total'],
+                          Colors.blue,
+                          Icons.bar_chart,
+                        ),
+                      ),
+
+                      SizedBox(width: 10),
+
+                      Expanded(
+                        child: _buildCard(
+                          "Essays",
+                          data['count'],
+                          Colors.green,
+                          Icons.edit_note,
+                        ),
+                      ),
+
+                      SizedBox(width: 10),
+
+                      Expanded(
+                        child: _buildCard(
+                          "Average",
+                          data['avg'],
+                          Colors.orange,
+                          Icons.trending_up,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  SizedBox(height: 30),
+
+                  SizedBox(height: 20),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.history),
+                      label: Text("Essay History"),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EssayHistoryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 🔥 INSIGHT BOX
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black12, blurRadius: 6),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.lightbulb, color: Colors.amber),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            "Keep practicing daily. Consistency is your biggest advantage.",
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard(String title, dynamic value, Color color, IconData icon) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 8,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white),
+
+          SizedBox(height: 10),
+
+          Text(
+            "$value",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+
+          SizedBox(height: 5),
+
+          Text(title, style: TextStyle(color: Colors.white70, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
 
 ////////////////////////////////////////////////////////////
-/// 📅 DATE SCREEN
+///////////////// ESSAY HISTORY SCREEN /////////////////////
+////////////////////////////////////////////////////////////
+
+class EssayHistoryScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    return Scaffold(
+      appBar: AppBar(title: Text("Essay History")),
+
+      body: StreamBuilder(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('essays')
+            .orderBy('timestamp', descending: true)
+            .snapshots(),
+
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return Center(child: Text("No essays submitted yet"));
+          }
+
+          return ListView.builder(
+            padding: EdgeInsets.all(16),
+            itemCount: docs.length,
+
+            itemBuilder: (context, index) {
+              final data = docs[index];
+
+              return Container(
+                margin: EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.all(12),
+
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+
+                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+                ),
+
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UserEssayDetailScreen(data: data),
+                      ),
+                    );
+                  },
+
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: Text(
+                      "${data['score']}",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+
+                  title: Text(
+                    data['topic'] ?? "Essay",
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+
+                  subtitle: Padding(
+                    padding: EdgeInsets.only(top: 6),
+
+                    child: Text(
+                      data['essay'] ?? "",
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+////////////////////////////////////////////////////////////
+/////////////// USER ESSAY DETAIL SCREEN ///////////////////
+////////////////////////////////////////////////////////////
+
+class UserEssayDetailScreen extends StatelessWidget {
+  final data;
+
+  UserEssayDetailScreen({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Essay Details")),
+
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // TOPIC
+            Text(
+              data['topic'] ?? "Essay",
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+
+            SizedBox(height: 20),
+
+            // SCORE CARD
+            Container(
+              padding: EdgeInsets.all(16),
+
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.circular(16),
+              ),
+
+              child: Row(
+                children: [
+                  Icon(Icons.star, color: Colors.white),
+
+                  SizedBox(width: 10),
+
+                  Text(
+                    "Score: ${data['score']}/20",
+
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 25),
+
+            // ESSAY TITLE
+            Text(
+              "Your Essay",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+
+            SizedBox(height: 10),
+
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(14),
+
+              decoration: BoxDecoration(
+                color: Colors.grey[200],
+                borderRadius: BorderRadius.circular(14),
+              ),
+
+              child: Text(
+                data['essay'] ?? "",
+
+                style: TextStyle(fontSize: 15, height: 1.6),
+              ),
+            ),
+
+            SizedBox(height: 25),
+
+            // FEEDBACK TITLE
+            Text(
+              "AI Feedback",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+
+            SizedBox(height: 10),
+
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(14),
+
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(14),
+              ),
+
+              child: Text(
+                data['feedback'] ?? "",
+
+                style: TextStyle(fontSize: 15, height: 1.6),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+////////////////////////////////////////////////////////////
+/// 📅 DATE SCREEN//////////////////////////////////////////
 ////////////////////////////////////////////////////////////
 
 class DateScreen extends StatelessWidget {
-
   List<String> generateDates() {
     List<String> dates = [];
 
@@ -259,8 +677,7 @@ class DateScreen extends StatelessWidget {
     for (int i = 0; i < 10; i++) {
       DateTime date = today.subtract(Duration(days: i));
 
-      String formatted =
-          "${date.day} ${_monthName(date.month)} ${date.year}";
+      String formatted = "${date.day} ${_monthName(date.month)} ${date.year}";
 
       dates.add(formatted);
     }
@@ -270,10 +687,20 @@ class DateScreen extends StatelessWidget {
 
   String _monthName(int month) {
     const months = [
-      "January", "February", "March", "April",
-      "May", "June", "July", "August",
-      "September", "October", "November", "December"
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
     ];
+
     return months[month - 1];
   }
 
@@ -283,31 +710,109 @@ class DateScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text("Select Date")),
+
       body: ListView.builder(
+        padding: EdgeInsets.all(12),
         itemCount: dates.length,
+
         itemBuilder: (context, index) {
-          return Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            elevation: 3,
-            child: ListTile(
-              title: Text(
-                dates[index],
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              leading: Icon(Icons.calendar_today, color: Colors.blue),
-              trailing: Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        EssayDetailScreen(date: dates[index]),
+          final currentDate = dates[index];
+
+          return FutureBuilder<DocumentSnapshot>(
+            future: FirebaseFirestore.instance
+                .collection('topics')
+                .doc(currentDate)
+                .get(),
+
+            builder: (context, snapshot) {
+              String topic = "Loading topic...";
+
+              if (snapshot.hasData && snapshot.data!.data() != null) {
+                final data = snapshot.data!.data() as Map<String, dynamic>;
+
+                topic = data['topic'] ?? "No topic available";
+              }
+
+              return Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+
+                elevation: 4,
+
+                margin: EdgeInsets.only(bottom: 14),
+
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            EssayDetailScreen(date: currentDate),
+                      ),
+                    );
+                  },
+
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 🔥 DATE ROW
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              color: Colors.blue,
+                              size: 18,
+                            ),
+
+                            SizedBox(width: 8),
+
+                            Text(
+                              currentDate,
+
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+
+                            Spacer(),
+
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                              color: Colors.grey,
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 14),
+
+                        // 🔥 TOPIC
+                        Text(
+                          topic,
+
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           );
         },
       ),
@@ -316,7 +821,7 @@ class DateScreen extends StatelessWidget {
 }
 
 ////////////////////////////////////////////////////////////
-/// 📝 ESSAY DETAIL SCREEN
+/// 📝 TOPIC OF THE DAY SCREEN//////////////////////////////////
 ////////////////////////////////////////////////////////////
 
 class EssayDetailScreen extends StatelessWidget {
@@ -324,104 +829,228 @@ class EssayDetailScreen extends StatelessWidget {
 
   EssayDetailScreen({required this.date});
 
-  // 🔥 Fetch topic
-  Future<String> fetchTopic() async {
-    final doc = await FirebaseFirestore.instance
-        .collection('topics')
-        .doc(date)
-        .get();
-
-    return doc.data()?['topic'] ?? "No topic available";
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(date)),
-      body: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
 
-            // 🔥 Topic Card
-            Container(
-              padding: EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(color: Colors.black12, blurRadius: 6),
-                ],
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 🔥 Topic Card
+              Container(
+                padding: EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(5),
+                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 6)],
+                ),
+
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Topic of the Day",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+
+                    SizedBox(height: 8),
+
+                    FutureBuilder(
+                      future: FirebaseFirestore.instance
+                          .collection('topics')
+                          .doc(date)
+                          .get(),
+
+                      builder: (context, snapshot) {
+                        if (!snapshot.hasData) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+
+                        final data = snapshot.data!.data();
+
+                        if (data == null) {
+                          return Text("No topic available");
+                        }
+
+                        final topic = data['topic'] ?? "";
+
+                        final dimensions = List<String>.from(
+                          data['dimensions'] ?? [],
+                        );
+
+                        final currentAffairs = List<String>.from(
+                          data['currentAffairs'] ?? [],
+                        );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 🔥 TOPIC
+                            Text(
+                              topic,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                            SizedBox(height: 10),
+
+                            // 🔥 DIMENSIONS
+                            Text(
+                              "Suggested Dimensions",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+
+                            SizedBox(height: 5),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: dimensions.map((dimension) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 0),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "• ",
+                                        style: TextStyle(fontSize: 13),
+                                      ),
+
+                                      Expanded(
+                                        child: Text(
+                                          dimension,
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+
+                            SizedBox(height: 10),
+
+                            // 🔥 CURRENT AFFAIRS
+                            Text(
+                              "Current Affairs Connections",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+
+                            SizedBox(height: 5),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: currentAffairs.map((item) {
+                                return Padding(
+                                  padding: EdgeInsets.only(bottom: 0),
+
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text("• "),
+
+                                      Expanded(
+                                        child: Text(
+                                          item,
+                                          style: TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+
+              SizedBox(height: 5),
+
+              // 🔥 Upload Button
+              Row(
                 children: [
-                  Text(
-                    "Topic of the Day",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                  // 🔥 Upload Essay Button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.upload_file),
+                      label: Text("Upload Essay"),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EssayScreen(date: date),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                  SizedBox(height: 8),
-                  FutureBuilder(
-                    future: fetchTopic(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return CircularProgressIndicator();
-                      }
-                      return Text(
-                        snapshot.data.toString(),
-                        style: TextStyle(fontSize: 15),
-                      );
-                    },
+
+                  SizedBox(width: 10),
+
+                  // 🔥 Community Chat Button
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: Icon(Icons.chat),
+                      label: Text("Discussion Room"),
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChatScreen(dateId: date),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
-            ),
 
-            SizedBox(height: 20),
+              SizedBox(height: 3),
 
-            // 🔥 Upload Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          EssayScreen(date: date),
-                    ),
-                  );
-                },
-                child: Text("Upload Your Essay"),
+              // 🔥 TOP SCORERS TITLE
+              Text(
+                "Top Scorers",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            ),
 
-            SizedBox(height: 20),
+              SizedBox(height: 10),
 
-            // 🔥 Title
-            Text(
-              "Scoreboard",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            SizedBox(height: 10),
-
-            // 🔥 SCOREBOARD
-            Expanded(
-              child: StreamBuilder(
+              // 🔥 TOP SCORERS LIST
+              StreamBuilder(
                 stream: FirebaseFirestore.instance
                     .collection('essays')
                     .doc(date)
                     .collection('submissions')
                     .orderBy('score', descending: true)
                     .snapshots(),
+
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return Center(child: CircularProgressIndicator());
@@ -430,27 +1059,37 @@ class EssayDetailScreen extends StatelessWidget {
                   final docs = snapshot.data!.docs;
 
                   if (docs.isEmpty) {
-                    return Center(child: Text("No submissions yet"));
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text("No submissions yet"),
+                      ),
+                    );
                   }
 
                   return ListView.builder(
+                    shrinkWrap: true,
+                    physics: NeverScrollableScrollPhysics(),
+
                     itemCount: docs.length,
+
                     itemBuilder: (context, index) {
                       final data = docs[index];
 
                       return Container(
-                        margin: EdgeInsets.symmetric(vertical: 6),
-                        padding: EdgeInsets.all(12),
+                        margin: EdgeInsets.symmetric(vertical: 1),
+
+                        padding: EdgeInsets.all(1),
+
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(15),
+                          borderRadius: BorderRadius.circular(5),
+
                           boxShadow: [
-                            BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 5,
-                            ),
+                            BoxShadow(color: Colors.black12, blurRadius: 5),
                           ],
                         ),
+
                         child: ListTile(
                           onTap: () {
                             Navigator.push(
@@ -461,21 +1100,25 @@ class EssayDetailScreen extends StatelessWidget {
                               ),
                             );
                           },
+
                           leading: CircleAvatar(
                             backgroundColor: Colors.blue,
                             child: Text("${index + 1}"),
                           ),
+
                           title: Text(
                             data['name'] ?? "User",
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
+
                           subtitle: Text(
                             data['essay'] ?? "",
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+
                           trailing: Text(
-                            "${data['score']}/250",
+                            "${data['score']}/20",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.green,
@@ -487,8 +1130,8 @@ class EssayDetailScreen extends StatelessWidget {
                   );
                 },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -531,11 +1174,8 @@ class FullEssayScreen extends StatelessWidget {
               SizedBox(height: 20),
 
               Text(
-                "Score: ${data['score']}/250",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                "Score: ${data['score']}/20",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
             ],
           ),
@@ -558,44 +1198,57 @@ class EssayScreen extends StatefulWidget {
 }
 
 class _EssayScreenState extends State<EssayScreen> {
-  File? _image;
+  List<File> _images = [];
   String feedback = "";
+  String essayText = "";
   bool loading = false;
 
   final picker = ImagePicker();
 
-  Future pickImage() async {
-    final pickedFile =
-        await picker.pickImage(source: ImageSource.gallery);
+  Future pickImages() async {
+    final pickedFiles = await picker.pickMultiImage();
 
-    if (pickedFile != null) {
+    if (pickedFiles != null && pickedFiles.isNotEmpty) {
       setState(() {
-        _image = File(pickedFile.path);
+        _images = pickedFiles.map((e) => File(e.path)).toList();
         feedback = "";
       });
 
-      await sendToGPT(_image!);
+      await sendToGPT(_images);
     }
   }
 
   int extractScore(String text) {
-    final regex = RegExp(r'Score:\s*(\d+)');
+    final regex = RegExp(r'(\d+)/20');
+
     final match = regex.firstMatch(text);
 
     if (match != null) {
       return int.parse(match.group(1)!);
     }
+
     return 0;
   }
 
-  Future sendToGPT(File imageFile) async {
+  Future sendToGPT(List<File> imageFiles) async {
+    print("🚀 STEP 0: sendToGPT started");
+
     setState(() {
       loading = true;
     });
 
     try {
-      final bytes = await imageFile.readAsBytes();
-      final base64Image = base64Encode(bytes);
+      List<Map<String, dynamic>> imageMessages = [];
+
+      for (var file in imageFiles) {
+        final bytes = await file.readAsBytes();
+        final base64Image = base64Encode(bytes);
+
+        imageMessages.add({
+          "type": "image_url",
+          "image_url": {"url": "data:image/jpeg;base64,$base64Image"},
+        });
+      }
 
       final snapshot = await FirebaseFirestore.instance
           .collection('training_feedback')
@@ -605,7 +1258,8 @@ class _EssayScreenState extends State<EssayScreen> {
       String trainingData = "";
 
       for (var doc in snapshot.docs) {
-        trainingData += """
+        trainingData +=
+            """
 Example Essay:
 ${doc['essay']}
 
@@ -616,8 +1270,28 @@ ${doc['feedback']}
 """;
       }
 
-      final apiKey = "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";
+      final topicDoc = await FirebaseFirestore.instance
+          .collection('topics')
+          .doc(widget.date)
+          .get();
 
+      final topicData = topicDoc.data() ?? {};
+
+      final topic = topicData['topic'] ?? "";
+      final contextInfo = topicData['context'] ?? "";
+
+      final dimensionsList = List<String>.from(topicData['dimensions'] ?? []);
+
+      final currentAffairsList = List<String>.from(
+        topicData['currentAffairs'] ?? [],
+      );
+
+      final dimensions = dimensionsList.join(", ");
+      final currentAffairs = currentAffairsList.join(", ");
+
+      final apiKey =
+          "paste your key";
+      print("📡 STEP 1: Sending request to OpenAI...");
       final response = await http.post(
         Uri.parse("https://api.openai.com/v1/chat/completions"),
         headers: {
@@ -625,27 +1299,208 @@ ${doc['feedback']}
           "Authorization": "Bearer $apiKey",
         },
         body: jsonEncode({
-          "model": "gpt-4o-mini",
+          "model": "gpt-4o",
           "messages": [
             {
               "role": "system",
-              "content": """
-You are a UPSC evaluator trained on the following examples.
+              "content":
+                  """
+            You are a strict and experienced UPSC CAPF paper 2 evaluator who has checked 1000+ copies.
 
-$trainingData
+            You follow my personal evaluation style.
 
-First convert image to text and write:
+            From the examples below, learn:
+            - Tone: constructive, honest, mentor-like (not robotic)
+            - Depth: specific, not generic
+            - Approach: always justify marks and give actionable feedback
 
-ESSAY:
-<clean essay>
+            Do NOT copy phrases from examples.
+            Do NOT repeat patterns blindly.
+            Apply the same thinking style to a NEW essay.
 
-Then give feedback in format:
+            ------------------------
+            TRAINING EXAMPLES:
+            $trainingData
+            ------------------------
 
-FEEDBACK:
-<your feedback>
+            CURRENT ESSAY TOPIC:
+            $topic
 
-Score: __/250
-"""
+            TOPIC CONTEXT:
+            $contextInfo
+
+            EXPECTED DIMENSIONS:
+            $dimensions
+
+            CURRENT AFFAIRS CONNECTIONS:
+            $currentAffairs
+
+            TASK:
+
+            These are multiple pages of a single UPSC essay.
+            The images are in order. Combine them into one continuous essay.
+            Ignore page breaks.
+
+            First extract and write:
+
+            ESSAY:
+            <clean essay text>
+
+            ------------------------
+
+            EVALUATION LOGIC:
+
+            Step 1: Evaluate the essay quality internally:
+            - STRONG
+            - AVERAGE
+            - WEAK
+
+            Step 2:
+            - HIGH → mostly strengths, minimal suggestions
+            - AVERAGE → balanced feedback
+            - WEAK → detailed improvements
+
+            Step 3:
+            Before suggesting anything, check:
+            “Is this missing?”
+
+            If NOT missing → DO NOT suggest.
+
+            ------------------------
+            TOPIC RELEVANCE RULES:
+
+            - Evaluate whether the essay actually addresses the core demand of the topic.
+            - Check whether the candidate understands the contemporary relevance of the topic.
+            - Reward essays that connect with current affairs naturally.
+            - Reward multidimensional analysis.
+            - Penalize essays that become generic and could fit any topic.
+            - Penalize repetition and vague philosophical writing disconnected from topic demand.
+            - Check whether important dimensions are missing.
+            - Do not expect every dimension, but major missing dimensions should affect marks.
+
+                 A strong CAPF essay usually contains:
+                 - social awareness
+                 - administrative understanding
+                 - contemporary relevance
+                 - examples/current affairs
+                 - clear structure
+                 - practical solutions
+                 - mature conclusion
+
+                 Weak essays are:
+                 - generic
+                 - repetitive
+                 - emotionally shallow 
+                 - lacking examples
+                 - disconnected from current realities
+                 - overly philosophical without substance
+
+            ------------------------
+
+            MARKING SCHEME:
+
+            STRUCTURE (0–8)
+            QUALITY OF CONTENT (0–8)
+            LANGUAGE (0–4)
+
+            TOTAL = 20
+
+            ------------------------
+
+            SCORING CALIBRATION:
+
+            06–09 = weak essay
+            10–13 = average essay
+            14–16 = strong essay
+            17–20 = exceptional essay rarely achieved
+
+            Do not inflate marks.
+            Be realistic and strict like actual CAPF evaluation.
+
+            ----------------------------
+
+
+            FORMAT:
+
+            STRUCTURE (x/8):
+            ...
+
+            ---
+
+            QUALITY OF CONTENT (x/8):
+            ...
+
+            ---
+
+            LANGUAGE (x/4):
+            ...
+
+            ---
+
+            STRENGTHS:
+            ...
+
+            ---
+
+            MISTAKES:
+            ...
+
+            ---
+
+            HOW TO IMPROVE:
+            ...
+
+            ---
+
+            FINAL SCORE: __/20
+
+            ------------------------
+
+            RULES:
+
+            - Do NOT suggest things already present in the essay.
+            - Before giving any criticism, first verify whether that weakness genuinely exists.
+            - Avoid generic feedback and vague observations.
+            - Every criticism must directly connect to the actual essay.
+
+            - Do not invent weaknesses simply to make the feedback look detailed.
+            - Be specific, evidence-based, and evaluator-like.
+
+            - If the candidate introduces relevant, meaningful, and non-generic dimensions beyond the provided topic guidance, reward originality.
+            - Do not rigidly expect exact dimensions listed in topic guidance.
+            - Do not penalize creative or unconventional approaches if they remain connected to the topic.
+
+            - Strong essays should receive mostly strengths with limited corrections.
+            - Weak essays should receive detailed, practical, and actionable improvement suggestions.
+
+            - Maintain a constructive, mentor-like, and realistic evaluation tone.
+            - Be honest, balanced, and strict like an actual CAPF evaluator.
+        
+            ------------------------
+
+            FINAL OUTPUT RULE (VERY IMPORTANT):
+
+            You must return your response ONLY in valid JSON format.
+
+            Do NOT write anything before or after JSON.
+
+            Format strictly like this:
+
+            {
+              "essay": "<clean extracted essay text>",
+              "feedback": "<full evaluation exactly as per format above>",
+              "score": <final score number only>
+            }
+
+            Rules:
+            - "score" must be a number (not string)
+            - Do NOT write "/20" inside score
+            - Do NOT add extra text outside JSON
+            - Ensure valid JSON (no trailing commas, proper quotes)
+            
+
+            If you fail to follow JSON format, the response is invalid.
+            """,
             },
             {
               "role": "user",
@@ -653,64 +1508,100 @@ Score: __/250
                 {
                   "type": "text",
                   "text":
-                      "Read this handwritten answer and evaluate it."
+                      "These are multiple pages of one essay. Read them in order and evaluate as a single essay. Evaluate this UPSC capf essay strictly as per instructions",
                 },
-                {
-                  "type": "image_url",
-                  "image_url": {
-                    "url": "data:image/jpeg;base64,$base64Image"
-                  }
-                }
-              ]
-            }
+                ...imageMessages,
+              ],
+            },
           ],
-          "max_tokens": 800
+          "max_tokens": 1500,
         }),
       );
+      print("✅ STEP 2: API response received");
+      print("STATUS: ${response.statusCode}");
+      print("BODY: ${response.body.substring(0, 200)}");
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        print("🧠 STEP 3: JSON parsed");
 
-        final fullResponse =
-            data["choices"]?[0]?["message"]?["content"] ?? "No response";
-        int score = extractScore(fullResponse);
+        print("📝 STEP 4: Full response extracted");
+        String fullResponse = data["choices"]?[0]?["message"]?["content"] ?? "";
+
+        // Clean JSON wrappers if present
+        fullResponse = fullResponse
+            .replaceAll("```json", "")
+            .replaceAll("```", "")
+            .trim();
 
         String essay = "";
         String feedbackText = "";
+        int score = 0;
 
-        // 🔥 Split logic
-        if (fullResponse.contains("FEEDBACK:")) {
-          final parts = fullResponse.split("FEEDBACK:");
-          essay = parts[0].replaceFirst("ESSAY:", "").trim();
-          feedbackText = parts[1].trim();
-        } else {
-          feedbackText = fullResponse;
+        try {
+          final parsed = jsonDecode(fullResponse);
+
+          essay = parsed['essay'] ?? "";
+          feedbackText = parsed['feedback'] ?? "";
+
+          score = (parsed['score'] is int)
+              ? parsed['score']
+              : int.tryParse(parsed['score'].toString()) ?? 0;
+
+          print("✅ JSON PARSED");
+        } catch (e) {
+          print("❌ JSON FAILED: $e");
+
+          // fallback (your original logic)
+          if (fullResponse.contains("STRUCTURE")) {
+            final parts = fullResponse.split("STRUCTURE");
+            essay = parts[0].replaceFirst("ESSAY:", "").trim();
+            feedbackText = "STRUCTURE" + parts[1];
+          } else {
+            feedbackText = fullResponse;
+          }
+
+          score = extractScore(fullResponse);
         }
-
+        print("🖥️ STEP 6: Updating UI");
         setState(() {
           feedback = feedbackText;
+          essayText = essay; // ✅ add this line
           loading = false;
         });
 
         // 🔥 USER FETCH
+        print("🔥 STEP 7: Starting Firestore operations");
         final user = FirebaseAuth.instance.currentUser;
         final uid = user!.uid;
 
+        // 📅 Create dayId (one essay per day)
+        final now = DateTime.now();
+        final dayId = "${now.year}-${now.month}-${now.day}";
+
+        // 📄 Global submission reference (for leaderboard etc.)
         final submissionRef = FirebaseFirestore.instance
             .collection('essays')
             .doc(widget.date)
             .collection('submissions')
             .doc(uid);
 
-        // 🔍 check old score
-        final doc = await submissionRef.get();
+        // 📄 User daily essay reference
+        final userEssayRef = FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('essays')
+            .doc(dayId);
 
-        int oldScore = 0;
-        if (doc.exists) {
-          oldScore = doc.data()?['score'] ?? 0;
+        // 🔍 Get previous score (IMPORTANT: before writing)
+        final userDoc = await userEssayRef.get();
+
+        int previousScore = 0;
+        if (userDoc.exists) {
+          previousScore = userDoc.data()?['score'] ?? 0;
         }
 
-        // 💾 save essay
+        // 💾 Save global submission (overwrite for same day/topic)
         await submissionRef.set({
           'essay': essay,
           'feedback': feedbackText,
@@ -720,14 +1611,29 @@ Score: __/250
           'timestamp': FieldValue.serverTimestamp(),
         });
 
-// 📊 update total score correctly
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .set({
-          'totalScore': FieldValue.increment(score - oldScore),
-        }, SetOptions(merge: true));
+        // 💾 Save / overwrite daily essay (ONE PER DAY)
+        await userEssayRef.set({
+          'score': score,
+          'essay': essay,
+          'feedback': feedbackText,
 
+          // 👇 topic metadata used during evaluation
+          'topic': topic,
+          'context': contextInfo,
+          'dimensions': dimensionsList,
+          'currentAffairs': currentAffairsList,
+
+          // 👇 useful for debugging
+          'rawModelResponse': fullResponse,
+
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+        // 📊 Update total score correctly
+        await FirebaseFirestore.instance.collection('users').doc(uid).set({
+          'totalScore': FieldValue.increment(score - previousScore),
+        }, SetOptions(merge: true));
+        print("✅ STEP 8: Firestore completed");
       } else {
         setState(() {
           feedback = "API Error";
@@ -735,6 +1641,8 @@ Score: __/250
         });
       }
     } catch (e) {
+      print("❌ ERROR OCCURRED: $e");
+
       setState(() {
         feedback = "Error occurred";
         loading = false;
@@ -748,25 +1656,193 @@ Score: __/250
       appBar: AppBar(title: Text("Upload Essay")),
       body: Padding(
         padding: EdgeInsets.all(16),
-        child: Column(
-          children: [
-            ElevatedButton(
-              onPressed: pickImage,
-              child: Text("Upload Image"),
-            ),
-            SizedBox(height: 20),
-            _image != null
-                ? Image.file(_image!, height: 200)
-                : Text("No image selected"),
-            SizedBox(height: 20),
-            loading
-                ? CircularProgressIndicator()
-                : Expanded(
-                    child: SingleChildScrollView(
-                      child: Text(feedback),
-                    ),
+        child: SingleChildScrollView(
+          child: Column(
+            children: [
+              ElevatedButton(
+                onPressed: pickImages,
+                child: Text("Upload Image"),
+              ),
+              SizedBox(height: 20),
+              _images.isNotEmpty
+                  ? SizedBox(
+                      height: 200,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _images.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: Image.file(
+                                    _images[index],
+                                    width: 120,
+                                    height: 180,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+
+                                // 🔢 Page number
+                                Positioned(
+                                  top: 5,
+                                  left: 5,
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black87,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      "Page ${index + 1}",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // 🔄 REORDER BUTTONS (ADD THIS)
+                                Positioned(
+                                  bottom: 5,
+                                  left: 5,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.arrow_back,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                          onPressed: index > 0
+                                              ? () {
+                                                  setState(() {
+                                                    final temp = _images[index];
+                                                    _images[index] =
+                                                        _images[index - 1];
+                                                    _images[index - 1] = temp;
+                                                  });
+                                                }
+                                              : null,
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.arrow_forward,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                          onPressed: index < _images.length - 1
+                                              ? () {
+                                                  setState(() {
+                                                    final temp = _images[index];
+                                                    _images[index] =
+                                                        _images[index + 1];
+                                                    _images[index + 1] = temp;
+                                                  });
+                                                }
+                                              : null,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                ///remove bar////////
+                                Positioned(
+                                  top: 5,
+                                  right: 5,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _images.removeAt(index);
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        Icons.close,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  : Text("No images selected"),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: (_images.isEmpty || loading)
+                    ? null
+                    : () async {
+                        await sendToGPT(_images);
+                      },
+                child: Text(loading ? "Evaluating..." : "Submit Essay"),
+              ),
+
+              // 👇👇👇 PASTE HERE (JUST AFTER BUTTON)
+              SizedBox(height: 20),
+
+              if (essayText.isNotEmpty) ...[
+                Text(
+                  "Your Essay",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 10),
+
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(10),
                   ),
-          ],
+                  child: Text(
+                    essayText,
+                    style: TextStyle(fontSize: 15, height: 1.5),
+                  ),
+                ),
+
+                SizedBox(height: 20),
+
+                Text(
+                  "Feedback",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 10),
+
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    feedback,
+                    style: TextStyle(fontSize: 15, height: 1.5),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
